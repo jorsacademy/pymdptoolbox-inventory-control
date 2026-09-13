@@ -57,7 +57,13 @@ def build_inventory_mdp(config: InventoryConfig) -> tuple[np.ndarray, np.ndarray
         for stock in range(states):
             post_order = min(config.max_inventory, stock + action)
             effective_order = post_order - stock
-            expected_cost = config.order_cost * effective_order
+            # The tail bucket gives exact next-stock probabilities, but its
+            # representative demand understates lost sales. Recover E[D]
+            # exactly so simulation and DP use the same unbounded Poisson law.
+            tail_excess = max(0.0, config.demand_rate - np.dot(
+                np.arange(len(demand_probs)), demand_probs))
+            expected_cost = (config.order_cost * effective_order
+                             + config.lost_sales_cost * tail_excess)
 
             for demand, prob in enumerate(demand_probs):
                 next_stock = max(post_order - demand, 0)
